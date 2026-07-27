@@ -1,6 +1,6 @@
 {
-    "name": "Riftbound Point Tracker",
-    "short_name": "Riftbound",
+    "name": "Riftbound Tracker",
+    "short_name": "Riftbound Tracker",
     "start_url": "/riftbound-tracker/",
     "scope": "/riftbound-tracker/",
     "display": "fullscreen",
