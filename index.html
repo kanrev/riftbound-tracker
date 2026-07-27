@@ -574,7 +574,7 @@
 
     <div class="bottom-nav">
         <div class="pill"      onclick="newGame()">New Game</div>
-        <div class="pill"      onclick="openHistory()">History</div>
+        <div class="pill"      onclick="openLog()">Log</div>
         <div class="pill-icon" onclick="openSettings()" title="Settings">⚙️</div>
     </div>
 
@@ -599,7 +599,14 @@
                 <input  class="rename-input" id="renameInput2" type="text" maxlength="20" placeholder="Player 2" />
                 <button class="rename-save-btn" onclick="saveName(2)">Save</button>
             </div>
-            <div class="settings-section-label" style="margin-top:16px;">Data</div>
+            <div class="settings-section-label" style="margin-top:16px;">Game Data</div>
+            <div class="settings-item" onclick="openHistory()">
+                <div class="settings-item-label">
+                    <div class="settings-item-title">History</div>
+                    <div class="settings-item-desc">View all saved games</div>
+                </div>
+                <div class="settings-item-icon">📋</div>
+            </div>
             <div class="settings-item danger" onclick="clearHistory()">
                 <div class="settings-item-label">
                     <div class="settings-item-title">Clear History</div>
@@ -632,6 +639,21 @@
                 <div class="col-player" id="detailP2Header">PLAYER 2</div>
             </div>
             <div id="detailRows"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="logModal">
+        <div class="modal-header">
+            <h2>Current Game Log</h2>
+            <button class="close-modal" onclick="closeLog()">×</button>
+        </div>
+        <div class="history-table" id="logContent">
+            <div class="table-header">
+                <div class="col-turn">TURN</div>
+                <div class="col-player" id="logP1Header">PLAYER 1</div>
+                <div class="col-player" id="logP2Header">PLAYER 2</div>
+            </div>
+            <div id="logRows"></div>
         </div>
     </div>
 
@@ -841,8 +863,46 @@
             }
         }
 
+        function openLog() {
+            renderCurrentGameLog();
+            document.getElementById('logModal').style.display = 'flex';
+        }
+
+        function closeLog() {
+            document.getElementById('logModal').style.display = 'none';
+        }
+
+        function renderCurrentGameLog() {
+            document.getElementById('logP1Header').innerText = getName(1).toUpperCase();
+            document.getElementById('logP2Header').innerText = getName(2).toUpperCase();
+
+            const rows = document.getElementById('logRows');
+            rows.innerHTML = '';
+
+            if (Object.keys(historyData).length === 0) {
+                rows.innerHTML = '<div class="empty-state">No moves recorded yet.</div>';
+                return;
+            }
+
+            const fmt = entries => entries.length
+                ? entries.map(e => `<span class="${e.endsWith('C') ? 'c-entry' : 'h-entry'}">${e}</span>`).join(' ')
+                : '—';
+
+            Object.keys(historyData).sort((a, b) => a - b).forEach(turn => {
+                const row = document.createElement('div');
+                row.className = 'table-row';
+                row.innerHTML = `
+                    <div class="col-turn">${turn}</div>
+                    <div class="col-player">${fmt(historyData[turn][1])}</div>
+                    <div class="col-player">${fmt(historyData[turn][2])}</div>
+                `;
+                rows.appendChild(row);
+            });
+        }
+
         function openHistory() {
             renderGameList();
+            document.getElementById('settingsModal').style.display = 'none';
             document.getElementById('historyModal').style.display = 'flex';
         }
 
