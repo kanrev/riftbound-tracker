@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riftbound Point Tracker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #0a0a0f;
+            color: #ffffff;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        body::before, body::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.12;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::before {
+            width: 340px;
+            height: 340px;
+            background: radial-gradient(circle, #ff8c00, transparent 70%);
+            top: -80px;
+            left: -80px;
+        }
+
+        body::after {
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, #3b82f6, transparent 70%);
+            bottom: -60px;
+            right: -60px;
+        }
+
+        .turn-btn-inline {
+            background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+            border: 1px solid rgba(255,255,255,0.12);
+            color: rgba(255,255,255,0.75);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1.6px;
+            padding: 9px 22px;
+            border-radius: 20px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .turn-btn-inline:active {
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.07));
+            box-shadow: 0 0 16px rgba(255,255,255,0.08);
+        }
+
+        .center-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+            flex-shrink: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .player-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-around;
+            padding: 20px 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .player-pane.p2 { transform: rotate(180deg); }
+
+        .player-pane::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .player-pane.flash-conquer::after {
+            background: radial-gradient(ellipse at center, rgba(255,140,0,0.2), transparent 70%);
+            animation: flashFade 0.45s ease-out forwards;
+        }
+
+        .player-pane.flash-hold::after {
+            background: radial-gradient(ellipse at center, rgba(59,130,246,0.2), transparent 70%);
+            animation: flashFade 0.45s ease-out forwards;
+        }
+
+        @keyframes flashFade {
+            0%   { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .pane-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .player-name {
+            font-size: 11px;
+            letter-spacing: 3px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.3);
+            text-transform: uppercase;
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 10px;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .player-name:active {
+            background: rgba(255,255,255,0.07);
+            color: rgba(255,255,255,0.7);
+        }
+
+        .score-display {
+            font-size: clamp(72px, 20vw, 96px);
+            font-weight: 200;
+            line-height: 1;
+            background: linear-gradient(160deg, #ffffff 40%, rgba(255,255,255,0.45));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .score-display.pop {
+            animation: scorePop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes scorePop {
+            0%   { transform: scale(1); }
+            50%  { transform: scale(1.18); }
+            100% { transform: scale(1); }
+        }
+
+        /* ── Button row ── */
+        .btn-row {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            width: 220px;
+        }
+
+        .action-btn {
+            flex: 1;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            padding: 15px 0;
+            cursor: pointer;
+            transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .action-btn:active { transform: scale(0.94); }
+        .action-btn:active::before { opacity: 1; }
+
+        .action-btn:disabled {
+            opacity: 0.25;
+            cursor: default;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-conquer {
+            background: linear-gradient(145deg, rgba(255,140,0,0.18), rgba(200,90,0,0.08));
+            border: 1px solid rgba(255,140,0,0.38);
+            color: #fb923c;
+            box-shadow: 0 2px 12px rgba(255,140,0,0.1);
+        }
+
+        .btn-conquer::before { background: rgba(255,140,0,0.15); }
+        .btn-conquer:active  { box-shadow: 0 0 22px rgba(255,140,0,0.38); }
+
+        .btn-hold {
+            background: linear-gradient(145deg, rgba(59,130,246,0.18), rgba(30,80,200,0.08));
+            border: 1px solid rgba(59,130,246,0.35);
+            color: #60a5fa;
+            box-shadow: 0 2px 12px rgba(59,130,246,0.1);
+        }
+
+        .btn-hold::before { background: rgba(59,130,246,0.15); }
+        .btn-hold:active  { box-shadow: 0 0 22px rgba(59,130,246,0.35); }
+
+        /* Undo — absolutely positioned, stretched to match action button height */
+        .undo-btn {
+            position: absolute;
+            left: calc(50% + 120px);
+            top: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 14px;
+            background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            color: rgba(255,255,255,0.3);
+            font-size: 18px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, transform 0.12s;
+        }
+
+        .undo-btn:active {
+            background: rgba(255,255,255,0.10);
+            color: rgba(255,255,255,0.8);
+            transform: scale(0.92);
+        }
+
+        .undo-btn:disabled { opacity: 0.2; cursor: default; }
+
+        /* ── Bottom Nav ── */
+        .bottom-nav {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 24px max(env(safe-area-inset-bottom), 16px);
+            flex-shrink: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .pill {
+            background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+            padding: 9px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1.2px;
+            color: rgba(255,255,255,0.65);
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: background 0.15s, box-shadow 0.15s;
+        }
+
+        .pill:active {
+            background: rgba(255,255,255,0.12);
+            box-shadow: 0 0 14px rgba(255,255,255,0.06);
+        }
+
+        .pill-icon {
+            background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+            padding: 9px 14px;
+            border-radius: 20px;
+            font-size: 17px;
+            line-height: 1;
+            color: rgba(255,255,255,0.65);
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s, transform 0.2s;
+        }
+
+        .pill-icon:active {
+            background: rgba(255,255,255,0.12);
+            transform: rotate(30deg);
+        }
+
+        /* ── Modal Base ── */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(8, 8, 14, 0.97);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 100;
+            flex-direction: column;
+            padding: 24px;
+            padding-top: max(env(safe-area-inset-top), 24px);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .modal-header h2 {
+            flex: 1;
+            margin: 0;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.45);
+            position: relative;
+            padding-bottom: 2px;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.5);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px 8px;
+            transition: color 0.15s;
+        }
+
+        .close-modal:active { color: #ffffff; }
+
+        .back-btn {
+            background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+            border: 1px solid rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.65);
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            padding: 7px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .back-btn:active { background: rgba(255,255,255,0.12); }
+
+        .delete-game-btn {
+            background: rgba(248,113,113,0.08);
+            border: 1px solid rgba(248,113,113,0.25);
+            color: #f87171;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.8px;
+            padding: 7px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background 0.15s, box-shadow 0.15s;
+            flex-shrink: 0;
+        }
+
+        .delete-game-btn:active {
+            background: rgba(248,113,113,0.18);
+            box-shadow: 0 0 14px rgba(248,113,113,0.2);
+        }
+
+        .settings-list { display: flex; flex-direction: column; gap: 10px; }
+
+        .settings-section-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.8px;
+            color: rgba(255,255,255,0.25);
+            text-transform: uppercase;
+            margin: 8px 4px 2px;
+        }
+
+        .settings-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            padding: 16px 20px;
+            cursor: pointer;
+            transition: background 0.15s, box-shadow 0.15s;
+            gap: 12px;
+        }
+
+        .settings-item:active { background: rgba(255,255,255,0.08); }
+
+        .settings-item-label { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+
+        .settings-item-title { font-size: 15px; font-weight: 500; letter-spacing: 0.3px; }
+
+        .settings-item-desc { font-size: 12px; color: rgba(255,255,255,0.3); letter-spacing: 0.4px; }
+
+        .settings-item-icon { font-size: 18px; color: rgba(255,255,255,0.2); flex-shrink: 0; }
+
+        .settings-item.rename-row { cursor: default; }
+        .settings-item.rename-row:active { background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)); }
+
+        .rename-input {
+            flex: 1;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 500;
+            padding: 8px 12px;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            min-width: 0;
+        }
+
+        .rename-input:focus {
+            border-color: rgba(255,255,255,0.3);
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.05);
+        }
+
+        .rename-save-btn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            color: rgba(255,255,255,0.7);
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.6px;
+            padding: 8px 14px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .rename-save-btn:active { background: rgba(255,255,255,0.16); color: #fff; }
+
+        .settings-item.danger .settings-item-title { color: #f87171; }
+        .settings-item.danger .settings-item-icon  { color: rgba(248,113,113,0.4); }
+
+        .settings-item.danger:active {
+            background: rgba(248,113,113,0.08);
+            box-shadow: 0 0 16px rgba(248,113,113,0.1);
+        }
+
+        .game-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .game-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            padding: 16px 18px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.15s, transform 0.12s;
+        }
+
+        .game-card:active { background: rgba(255,255,255,0.08); transform: scale(0.98); }
+
+        .game-card-info { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+
+        .game-card-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #ffffff;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .game-card-meta { font-size: 12px; color: rgba(255,255,255,0.3); letter-spacing: 0.6px; }
+
+        .game-card-scores { display: flex; gap: 14px; align-items: center; flex-shrink: 0; margin-left: 12px; }
+
+        .score-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+
+        .score-chip span:first-child { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: rgba(255,255,255,0.3); }
+        .score-chip span:last-child  { font-size: 20px; font-weight: 200; color: #ffffff; }
+
+        .score-divider { font-size: 18px; font-weight: 200; color: rgba(255,255,255,0.15); }
+        .chevron { font-size: 18px; color: rgba(255,255,255,0.18); margin-left: 10px; }
+
+        .empty-state {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.25);
+            font-size: 15px;
+        }
+
+        .history-table { flex: 1; overflow-y: auto; }
+
+        .table-header, .table-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+
+        .table-header { color: rgba(255,255,255,0.4); font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+
+        .col-turn   { flex: 1; }
+        .col-player { flex: 2; text-align: center; letter-spacing: 1.2px; }
+        .table-row  { color: #ffffff; font-size: 14px; }
+
+        .c-entry { color: #fb923c; }
+        .h-entry { color: #60a5fa; }
+    </style>
+</head>
+<body>
+
+    <div class="player-pane p2" id="pane2">
+        <button class="turn-btn-inline" id="turnBtnP2" onclick="nextTurn()">TURN 1</button>
+        <div class="pane-center">
+            <div class="player-name" id="p2Name" onclick="openRenameFromPane(2)">Player 2</div>
+            <div class="score-display" id="p2Score">0</div>
+        </div>
+        <div class="btn-row">
+            <div class="action-buttons">
+                <button class="action-btn btn-conquer" onclick="scorePoint(2,'C')">Conquer</button>
+                <button class="action-btn btn-hold"    onclick="scorePoint(2,'H')">Hold</button>
+            </div>
+            <button class="undo-btn" id="undoBtn2" onclick="undoAction(2)" disabled><span style="display:inline-block; transform:rotate(290deg);">&#8634;</span></button>
+        </div>
+    </div>
+
+    <div class="center-divider"></div>
+
+    <div class="player-pane p1" id="pane1">
+        <button class="turn-btn-inline" id="turnBtnP1" onclick="nextTurn()">TURN 1</button>
+        <div class="pane-center">
+            <div class="player-name" id="p1Name" onclick="openRenameFromPane(1)">Player 1</div>
+            <div class="score-display" id="p1Score">0</div>
+        </div>
+        <div class="btn-row">
+            <div class="action-buttons">
+                <button class="action-btn btn-conquer" onclick="scorePoint(1,'C')">Conquer</button>
+                <button class="action-btn btn-hold"    onclick="scorePoint(1,'H')">Hold</button>
+            </div>
+            <button class="undo-btn" id="undoBtn1" onclick="undoAction(1)" disabled><span style="display:inline-block; transform:rotate(290deg);">&#8634;</span></button>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="pill"      onclick="newGame()">New Game</div>
+        <div class="pill"      onclick="openHistory()">History</div>
+        <div class="pill-icon" onclick="openSettings()" title="Settings">⚙️</div>
+    </div>
+
+    <div class="modal" id="settingsModal">
+        <div class="modal-header">
+            <h2>Settings</h2>
+            <button class="close-modal" onclick="closeSettings()">×</button>
+        </div>
+        <div class="settings-list">
+            <div class="settings-section-label">Players</div>
+            <div class="settings-item rename-row">
+                <div class="settings-item-label">
+                    <div class="settings-item-desc">Player 1 Name</div>
+                </div>
+                <input  class="rename-input" id="renameInput1" type="text" maxlength="20" placeholder="Player 1" />
+                <button class="rename-save-btn" onclick="saveName(1)">Save</button>
+            </div>
+            <div class="settings-item rename-row">
+                <div class="settings-item-label">
+                    <div class="settings-item-desc">Player 2 Name</div>
+                </div>
+                <input  class="rename-input" id="renameInput2" type="text" maxlength="20" placeholder="Player 2" />
+                <button class="rename-save-btn" onclick="saveName(2)">Save</button>
+            </div>
+            <div class="settings-section-label" style="margin-top:16px;">Data</div>
+            <div class="settings-item danger" onclick="clearHistory()">
+                <div class="settings-item-label">
+                    <div class="settings-item-title">Clear History</div>
+                    <div class="settings-item-desc">Permanently delete all saved games</div>
+                </div>
+                <div class="settings-item-icon">🗑</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="historyModal">
+        <div class="modal-header">
+            <h2>Game History</h2>
+            <button class="close-modal" onclick="closeHistory()">×</button>
+        </div>
+        <div class="game-list" id="gameList"></div>
+    </div>
+
+    <div class="modal" id="detailModal">
+        <div class="modal-header">
+            <button class="back-btn" onclick="backToList()">← Back</button>
+            <h2 id="detailTitle"></h2>
+            <button class="delete-game-btn" id="deleteGameBtn">Delete</button>
+            <button class="close-modal" onclick="closeHistory()">×</button>
+        </div>
+        <div class="history-table">
+            <div class="table-header">
+                <div class="col-turn">TURN</div>
+                <div class="col-player" id="detailP1Header">PLAYER 1</div>
+                <div class="col-player" id="detailP2Header">PLAYER 2</div>
+            </div>
+            <div id="detailRows"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentTurn = 1;
+        let p1Score = 0;
+        let p2Score = 0;
+        let historyData = {};
+        let savedGames = loadGames();
+        let viewingGameId = null;
+        let turnEventCounter = 0;
+
+        // Each entry: { type: 'score', turn: N } or { type: 'turn', id: N }
+        const undoStack = { 1: [], 2: [] };
+
+        const playerNames = { 1: 'Player 1', 2: 'Player 2' };
+
+        function getName(p) { return playerNames[p]; }
+
+        function saveName(player) {
+            const input = document.getElementById(`renameInput${player}`);
+            const val = input.value.trim();
+            if (!val) return;
+            playerNames[player] = val;
+            document.getElementById(`p${player}Name`).innerText = val;
+            input.value = '';
+            const btn = input.nextElementSibling;
+            btn.innerText = '✓';
+            setTimeout(() => btn.innerText = 'Save', 1200);
+        }
+
+        function openRenameFromPane(player) {
+            openSettings();
+            const input = document.getElementById(`renameInput${player}`);
+            input.value = getName(player);
+            setTimeout(() => input.focus(), 100);
+        }
+
+        function nextTurn() {
+            currentTurn++;
+            const id = ++turnEventCounter;
+            // Push the same turn event (by shared id) onto both stacks
+            undoStack[1].push({ type: 'turn', id });
+            undoStack[2].push({ type: 'turn', id });
+            updateTurnLabel();
+            refreshUndoButtons();
+        }
+
+        function updateTurnLabel() {
+            const label = `TURN ${currentTurn}`;
+            document.getElementById('turnBtnP1').innerText = label;
+            document.getElementById('turnBtnP2').innerText = label;
+        }
+
+        function scorePoint(player, type) {
+            const score = player === 1 ? p1Score : p2Score;
+	    if (score >= 8) return;
+            if (player === 1) {
+                p1Score++;
+                document.getElementById('p1Score').innerText = p1Score;
+            } else {
+                p2Score++;
+                document.getElementById('p2Score').innerText = p2Score;
+            }
+
+            const currentTotal = (player === 1) ? p1Score : p2Score;
+
+            if (!historyData[currentTurn]) historyData[currentTurn] = { 1: [], 2: [] };
+            historyData[currentTurn][player].push(`${currentTotal}${type}`);
+
+            undoStack[player].push({ type: 'score', turn: currentTurn });
+            refreshUndoButtons();
+
+            const scoreEl = document.getElementById(`p${player}Score`);
+            scoreEl.classList.remove('pop');
+            void scoreEl.offsetWidth;
+            scoreEl.classList.add('pop');
+
+            const pane = document.getElementById(`pane${player}`);
+            pane.classList.remove('flash-conquer', 'flash-hold');
+            void pane.offsetWidth;
+            pane.classList.add(type === 'C' ? 'flash-conquer' : 'flash-hold');
+          
+            refreshActionButtons();
+        }
+
+        function undoAction(player) {
+            if (undoStack[player].length === 0) return;
+
+            const action = undoStack[player].pop();
+
+            if (action.type === 'turn') {
+                // Decrement the turn counter
+                currentTurn--;
+                updateTurnLabel();
+                // Remove the matching turn event from the other player's stack
+                const other = player === 1 ? 2 : 1;
+                const idx = undoStack[other].findLastIndex(a => a.type === 'turn' && a.id === action.id);
+                if (idx !== -1) undoStack[other].splice(idx, 1);
+            } else {
+                // Undo a scored point
+                const turn = action.turn;
+                historyData[turn][player].pop();
+
+                if (historyData[turn][1].length === 0 && historyData[turn][2].length === 0) {
+                    delete historyData[turn];
+                }
+
+                if (player === 1) {
+                    p1Score--;
+                    document.getElementById('p1Score').innerText = p1Score;
+                } else {
+                    p2Score--;
+                    document.getElementById('p2Score').innerText = p2Score;
+                }
+
+                // Re-number shorthand entries for this player
+                let idx = 1;
+                Object.keys(historyData).sort((a, b) => a - b).forEach(t => {
+                    historyData[t][player] = historyData[t][player].map(e => `${idx++}${e.slice(-1)}`);
+                });
+            }
+
+            refreshUndoButtons();
+            refreshActionButtons();
+        }
+
+        function refreshUndoButtons() {
+            document.getElementById('undoBtn1').disabled = undoStack[1].length === 0;
+            document.getElementById('undoBtn2').disabled = undoStack[2].length === 0;
+        }
+
+        function refreshActionButtons() {
+            const p1Capped = p1Score >= 8;
+            const p2Capped = p2Score >= 8;
+
+            document.querySelectorAll('#pane1 .action-btn').forEach(btn => btn.disabled = p1Capped);
+            document.querySelectorAll('#pane2 .action-btn').forEach(btn => btn.disabled = p2Capped);
+        }
+
+        function newGame() {
+            if (p1Score === 0 && p2Score === 0) {
+                if (!confirm("Start a new game?")) return;
+            } else {
+                if (!confirm("Save this game and start a new one?")) return;
+                saveCurrentGame();
+            }
+            resetState();
+        }
+
+        function loadGames() {
+            try { return JSON.parse(localStorage.getItem('riftbound_savedGames') || '[]'); }
+            catch { return []; }
+        }
+
+        function persistGames() {
+            localStorage.setItem('riftbound_savedGames', JSON.stringify(savedGames));
+        }
+
+        function saveCurrentGame() {
+            savedGames.push({
+                id: Date.now(),
+                title: `${getName(1)} vs ${getName(2)} — ${formatDateTime(new Date())}`,
+                p1Name: getName(1),
+                p2Name: getName(2),
+                p1Final: p1Score,
+                p2Final: p2Score,
+                historyData: JSON.parse(JSON.stringify(historyData))
+            });
+            persistGames()
+        }
+
+        function formatDateTime(date) {
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                + ' ' + date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        }
+
+        function resetState() {
+            currentTurn = 1;
+            p1Score = 0;
+            p2Score = 0;
+            historyData = {};
+            undoStack[1] = [];
+            undoStack[2] = [];
+            turnEventCounter = 0;
+            document.getElementById('p1Score').innerText = "0";
+            document.getElementById('p2Score').innerText = "0";
+            updateTurnLabel();
+            refreshUndoButtons();
+            refreshActionButtons();
+        }
+
+        function openSettings() {
+            document.getElementById('renameInput1').placeholder = getName(1);
+            document.getElementById('renameInput2').placeholder = getName(2);
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+
+        function clearHistory() {
+            if (savedGames.length === 0) { alert("No saved games to clear."); return; }
+            if (confirm("Permanently delete all saved game history? This cannot be undone.")) {
+                savedGames = [];
+                persistGames();
+                closeSettings();
+            }
+        }
+
+        function openHistory() {
+            renderGameList();
+            document.getElementById('historyModal').style.display = 'flex';
+        }
+
+        function renderGameList() {
+            const list = document.getElementById('gameList');
+            list.innerHTML = '';
+
+            if (savedGames.length === 0) {
+                list.innerHTML = '<div class="empty-state">No saved games yet.</div>';
+                return;
+            }
+
+            [...savedGames].reverse().forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                card.innerHTML = `
+                    <div class="game-card-info">
+                        <div class="game-card-title">${game.title}</div>
+                        <div class="game-card-meta">${Object.keys(game.historyData).length} turn(s)</div>
+                    </div>
+                    <div class="game-card-scores">
+                        <div class="score-chip"><span>${game.p1Name}</span><span>${game.p1Final}</span></div>
+                        <div class="score-divider">–</div>
+                        <div class="score-chip"><span>${game.p2Name}</span><span>${game.p2Final}</span></div>
+                    </div>
+                    <div class="chevron">›</div>
+                `;
+                card.onclick = () => openDetail(game);
+                list.appendChild(card);
+            });
+        }
+
+        function closeHistory() {
+            document.getElementById('historyModal').style.display = 'none';
+            document.getElementById('detailModal').style.display  = 'none';
+            viewingGameId = null;
+        }
+
+        function openDetail(game) {
+            viewingGameId = game.id;
+            document.getElementById('detailTitle').innerText    = game.title;
+            document.getElementById('detailP1Header').innerText = game.p1Name.toUpperCase();
+            document.getElementById('detailP2Header').innerText = game.p2Name.toUpperCase();
+
+            const deleteBtn = document.getElementById('deleteGameBtn');
+            deleteBtn.onclick = () => deleteGame(game.id);
+
+            const rows = document.getElementById('detailRows');
+            rows.innerHTML = '';
+
+            Object.keys(game.historyData).sort((a, b) => a - b).forEach(turn => {
+                const fmt = entries => entries.length
+                    ? entries.map(e => `<span class="${e.endsWith('C') ? 'c-entry' : 'h-entry'}">${e}</span>`).join(' ')
+                    : '—';
+
+                const row = document.createElement('div');
+                row.className = 'table-row';
+                row.innerHTML = `
+                    <div class="col-turn">${turn}</div>
+                    <div class="col-player">${fmt(game.historyData[turn][1])}</div>
+                    <div class="col-player">${fmt(game.historyData[turn][2])}</div>
+                `;
+                rows.appendChild(row);
+            });
+
+            document.getElementById('historyModal').style.display = 'none';
+            document.getElementById('detailModal').style.display  = 'flex';
+        }
+
+        function deleteGame(id) {
+            if (!confirm("Delete this game from history? This cannot be undone.")) return;
+            savedGames = savedGames.filter(g => g.id !== id);
+            persistGames();
+            document.getElementById('detailModal').style.display = 'none';
+            viewingGameId = null;
+            renderGameList();
+            document.getElementById('historyModal').style.display = 'flex';
+        }
+
+        function backToList() {
+            document.getElementById('detailModal').style.display  = 'none';
+            document.getElementById('historyModal').style.display = 'flex';
+        }
+
+        // ── PWA Service Worker ──
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/riftbound-tracker/sw.js', {
+                    scope: '/riftbound-tracker/'
+                }).catch(() => {});
+            });
+        }
+    </script>
+</body>
+</html>
