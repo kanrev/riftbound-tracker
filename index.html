@@ -757,11 +757,16 @@
 
             // Increment the turn only when both players have pressed End Turn
             if (playersEndedTurn[1] && playersEndedTurn[2]) {
-                currentTurn++;
-                playersEndedTurn[1] = false;
-                playersEndedTurn[2] = false;
-                incremented = true;
+            // If no points were scored during this turn, record an empty entry for it
+            if (!historyData[currentTurn]) {
+                historyData[currentTurn] = { 1: [], 2: [] };
             }
+
+            currentTurn++;
+            playersEndedTurn[1] = false;
+            playersEndedTurn[2] = false;
+            incremented = true;
+        }
 
             const id = ++turnEventCounter;
             const action = { type: 'turn', id, player, incremented };
@@ -819,32 +824,44 @@
             const action = undoStack[player].pop();
 
             if (action.type === 'turn') {
-                if (action.incremented) {
-                    // Step back the turn counter and restore the state where the other player had ended their turn
-                    currentTurn--;
-                    const otherPlayer = action.player === 1 ? 2 : 1;
-                    playersEndedTurn[otherPlayer] = true;
-                    playersEndedTurn[action.player] = false;
-                } else {
-                    // Revert only the single player's End Turn press
-                    playersEndedTurn[action.player] = false;
+            if (action.incremented) {
+            // Step back the turn counter and restore state
+                currentTurn--;
+                const otherPlayer = action.player === 1 ? 2 : 1;
+                playersEndedTurn[otherPlayer] = true;
+                playersEndedTurn[action.player] = false;
+
+                // If stepping back makes this the active turn again and no scores were made,
+                // remove its placeholder from historyData
+                if (historyData[currentTurn] && 
+                    historyData[currentTurn][1].length === 0 && 
+                    historyData[currentTurn][2].length === 0) {
+                    delete historyData[currentTurn];
                 }
-
-                updateTurnLabel();
-                refreshEndTurnButtons();
-
-                // Remove the matching turn event from the other player's stack
-                const other = player === 1 ? 2 : 1;
-                const idx = undoStack[other].findLastIndex(a => a.type === 'turn' && a.id === action.id);
-                if (idx !== -1) undoStack[other].splice(idx, 1);
             } else {
-                // Undo a scored point
-                const turn = action.turn;
-                historyData[turn][player].pop();
+                // Revert only the single player's End Turn press
+                playersEndedTurn[action.player] = false;
+            }
 
-                if (historyData[turn][1].length === 0 && historyData[turn][2].length === 0) {
-                    delete historyData[turn];
-                }
+            updateTurnLabel();
+            refreshEndTurnButtons();
+
+            // Remove the matching turn event from the other player's stack
+            const other = player === 1 ? 2 : 1;
+            const idx = undoStack[other].findLastIndex(a => a.type === 'turn' && a.id === action.id);
+            if (idx !== -1) undoStack[other].splice(idx, 1);
+            } else {
+            // Undo a scored point
+            const turn = action.turn;
+            historyData[turn][player].pop();
+
+            // Only delete the turn record if it's the active turn and now empty.
+            // Completed turns (turn < currentTurn) stay preserved as empty dashes.
+            if (turn === currentTurn && 
+                historyData[turn][1].length === 0 && 
+                historyData[turn][2].length === 0) {
+                delete historyData[turn];
+            }
 
                 if (player === 1) {
                     p1Score--;
