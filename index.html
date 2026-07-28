@@ -67,15 +67,24 @@
         }
 
         .turn-display {
-            background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-            border: 1px solid rgba(255,255,255,0.1);
-            color: rgba(255,255,255,0.5);
+            background: rgba(255, 255, 255, 0.03);
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
             font-size: 11px;
             font-weight: 700;
             letter-spacing: 2px;
-            padding: 6px 18px;
-            border-radius: 16px;
-            white-space: nowrap;
+            padding: 4px 14px;
+            border-radius: 12px;
+        }
+
+        .turn-display.pop {
+            animation: turnPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes turnPop {
+            0%   { transform: scale(1); color: rgba(255, 255, 255, 0.4); text-shadow: none; }
+            50%  { transform: scale(1.2); color: #ffffff; text-shadow: 0 0 16px rgba(255, 255, 255, 0.8); }
+            100% { transform: scale(1); color: rgba(255, 255, 255, 0.4); text-shadow: none; }
         }
 
         .end-turn-btn {
@@ -361,20 +370,33 @@
         .modal-header {
             display: flex;
             align-items: center;
-            gap: 12px;
+            flex-wrap: wrap;
+            gap: 16px;
             margin-bottom: 24px;
         }
 
+        .detail-nav-row {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            gap: 12px;
+        }
+
         .modal-header h2 {
-            flex: 1;
             margin: 0;
             font-size: 13px;
             font-weight: 700;
             letter-spacing: 3px;
             text-transform: uppercase;
             color: rgba(255, 255, 255, 0.45);
-            position: relative;
-            padding-bottom: 2px;
+        }
+
+        #detailModal h2 {
+            width: 100%;
+            margin-top: 4px;
+            font-size: 14px;
+            letter-spacing: 2px;
+            word-break: break-word;
         }
 
         .close-modal {
@@ -669,11 +691,12 @@
 
     <div class="modal" id="detailModal">
         <div class="modal-header">
-            <button class="back-btn" onclick="backToList()">← Back</button>
-            <button class="delete-game-btn" id="deleteGameBtn">Delete</button>
-            <button class="close-modal" onclick="closeHistory()">×</button>
-        </div>
-        <div>
+            <div class="detail-nav-row">
+                <button class="back-btn" onclick="backToList()">← Back</button>
+                <div style="flex:1;"></div>
+                <button class="delete-game-btn" id="deleteGameBtn">Delete</button>
+                <button class="close-modal" onclick="closeHistory()">×</button>
+            </div>
             <h2 id="detailTitle"></h2>
         </div>
         <div class="history-table">
@@ -711,9 +734,7 @@
         let viewingGameId = null;
         let turnEventCounter = 0;
 
-        // Each entry: { type: 'score', turn: N } or { type: 'turn', id: N, player: P, incremented: boolean }
         const undoStack = { 1: [], 2: [] };
-
         const playerNames = { 1: 'Player 1', 2: 'Player 2' };
 
         function getName(p) { return playerNames[p]; }
@@ -741,11 +762,7 @@
             const btn1 = document.getElementById('endTurnBtn1');
             const btn2 = document.getElementById('endTurnBtn2');
 
-            // Player 1 is enabled as long as they haven't ended their turn
             btn1.disabled = playersEndedTurn[1];
-
-            // Player 2 is enabled if they haven't ended their turn AND
-            // either it is Turn 1 (game start) or Player 1 has already finished their turn
             btn2.disabled = playersEndedTurn[2] || (currentTurn > 1 && !playersEndedTurn[1]);
         }
 
@@ -755,27 +772,26 @@
             playersEndedTurn[player] = true;
             let incremented = false;
 
-            // Increment the turn only when both players have pressed End Turn
             if (playersEndedTurn[1] && playersEndedTurn[2]) {
-            // If no points were scored during this turn, record an empty entry for it
-            if (!historyData[currentTurn]) {
-                historyData[currentTurn] = { 1: [], 2: [] };
-            }
+                if (!historyData[currentTurn]) {
+                    historyData[currentTurn] = { 1: [], 2: [] };
+                }
 
-            currentTurn++;
-            playersEndedTurn[1] = false;
-            playersEndedTurn[2] = false;
-            incremented = true;
-        }
+                currentTurn++;
+                playersEndedTurn[1] = false;
+                playersEndedTurn[2] = false;
+                incremented = true;
+
+                updateTurnLabel();
+                animateTurnDisplays();
+            }
 
             const id = ++turnEventCounter;
             const action = { type: 'turn', id, player, incremented };
 
-            // Push event onto both undo stacks so either player can undo it
             undoStack[1].push(action);
             undoStack[2].push(action);
 
-            updateTurnLabel();
             refreshUndoButtons();
             refreshEndTurnButtons();
         }
@@ -784,6 +800,15 @@
             const label = `TURN ${currentTurn}`;
             document.getElementById('turnDisplay1').innerText = label;
             document.getElementById('turnDisplay2').innerText = label;
+        }
+
+        function animateTurnDisplays() {
+            ['turnDisplay1', 'turnDisplay2'].forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('pop');
+                void el.offsetWidth;
+                el.classList.add('pop');
+            });
         }
 
         function scorePoint(player, type) {
@@ -824,44 +849,36 @@
             const action = undoStack[player].pop();
 
             if (action.type === 'turn') {
-            if (action.incremented) {
-            // Step back the turn counter and restore state
-                currentTurn--;
-                const otherPlayer = action.player === 1 ? 2 : 1;
-                playersEndedTurn[otherPlayer] = true;
-                playersEndedTurn[action.player] = false;
+                if (action.incremented) {
+                    currentTurn--;
+                    const otherPlayer = action.player === 1 ? 2 : 1;
+                    playersEndedTurn[otherPlayer] = true;
+                    playersEndedTurn[action.player] = false;
 
-                // If stepping back makes this the active turn again and no scores were made,
-                // remove its placeholder from historyData
-                if (historyData[currentTurn] && 
-                    historyData[currentTurn][1].length === 0 && 
-                    historyData[currentTurn][2].length === 0) {
-                    delete historyData[currentTurn];
+                    if (historyData[currentTurn] && 
+                        historyData[currentTurn][1].length === 0 && 
+                        historyData[currentTurn][2].length === 0) {
+                        delete historyData[currentTurn];
+                    }
+                } else {
+                    playersEndedTurn[action.player] = false;
                 }
+
+                updateTurnLabel();
+                refreshEndTurnButtons();
+
+                const other = player === 1 ? 2 : 1;
+                const idx = undoStack[other].findLastIndex(a => a.type === 'turn' && a.id === action.id);
+                if (idx !== -1) undoStack[other].splice(idx, 1);
             } else {
-                // Revert only the single player's End Turn press
-                playersEndedTurn[action.player] = false;
-            }
+                const turn = action.turn;
+                historyData[turn][player].pop();
 
-            updateTurnLabel();
-            refreshEndTurnButtons();
-
-            // Remove the matching turn event from the other player's stack
-            const other = player === 1 ? 2 : 1;
-            const idx = undoStack[other].findLastIndex(a => a.type === 'turn' && a.id === action.id);
-            if (idx !== -1) undoStack[other].splice(idx, 1);
-            } else {
-            // Undo a scored point
-            const turn = action.turn;
-            historyData[turn][player].pop();
-
-            // Only delete the turn record if it's the active turn and now empty.
-            // Completed turns (turn < currentTurn) stay preserved as empty dashes.
-            if (turn === currentTurn && 
-                historyData[turn][1].length === 0 && 
-                historyData[turn][2].length === 0) {
-                delete historyData[turn];
-            }
+                if (turn === currentTurn && 
+                    historyData[turn][1].length === 0 && 
+                    historyData[turn][2].length === 0) {
+                    delete historyData[turn];
+                }
 
                 if (player === 1) {
                     p1Score--;
@@ -871,7 +888,6 @@
                     document.getElementById('p2Score').innerText = p2Score;
                 }
 
-                // Re-number shorthand entries for this player
                 let idx = 1;
                 Object.keys(historyData).sort((a, b) => a - b).forEach(t => {
                     historyData[t][player] = historyData[t][player].map(e => `${idx++}${e.slice(-1)}`);
@@ -1090,7 +1106,6 @@
             document.getElementById('historyModal').style.display = 'flex';
         }
 
-        // ── PWA Service Worker ──
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/riftbound-tracker/sw.js', {
