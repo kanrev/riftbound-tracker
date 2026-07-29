@@ -469,6 +469,14 @@
         .settings-item.rename-row { cursor: default; }
         .settings-item.rename-row:active { background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)); }
 
+        .version-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.8px;
+            color: rgba(255,255,255,0.25);
+            margin: 8px 4px 2px;
+        }
+
         .rename-input {
             flex: 1;
             background: rgba(255,255,255,0.06);
