@@ -1,4 +1,4 @@
-const CACHE = 'riftbound-v1.02';
+const CACHE = 'riftbound-v1.03';
 const FILES = [
     './',
     './index.html',
